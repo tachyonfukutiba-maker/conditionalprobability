@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>条件付き確率</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --panel-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #cbd5e1;
+            --primary-color: #2563eb;
+            --highlight-color: #ea580c;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --dark-bg: #0f172a;
+            --warning-color: #f59e0b;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        h1 { margin: 0; font-size: 1.3rem; border-left: 5px solid var(--primary-color); padding-left: 10px; }
+        
+        .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        button { background: var(--primary-color); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: filter 0.2s;}
+        button.btn-del { background: #ef4444; }
+        button.btn-save { background: #059669; }
+        button.btn-share { background: #7c3aed; }
+        button.btn-clear { background: #64748b; }
+        button.btn-warning { background: var(--warning-color); color: #fff; display: none; }
+        button:hover { filter: brightness(0.9); }
+
+        .calculator-setup {
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+        }
+
+        .matrix-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .matrix-table th, .matrix-table td { border: 1px solid var(--border-color); padding: 8px; text-align: center; }
+        
+        .th-input {
+            background: #f1f5f9;
+            border: 1px dashed #94a3b8;
+            font-weight: bold;
+            font-size: 0.85rem;
+            text-align: center;
+            width: 90%;
+            padding: 4px;
+            color: #334155;
+        }
+
+        .input-label { width: 90%; padding: 4px; border: 1px solid var(--border-color); border-radius: 4px; text-align: center; font-weight: bold;}
+        .input-num { width: 65px; padding: 4px; border: 2px solid var(--primary-color); border-radius: 4px; text-align: center; font-weight: bold;}
+
+        .total-row { font-weight: bold; background-color: #f8fafc; }
+        #total-pa.error { color: #ef4444; }
+
+        .simulator-core { display: flex; gap: 20px; min-height: 400px; flex-wrap: wrap; }
+        .pane { background: var(--panel-bg); border-radius: 8px; box-shadow: var(--shadow); padding: 15px; flex: 1; min-width: 450px; display: flex; flex-direction: column; }
+        .pane h2 { margin-top: 0; font-size: 0.95rem; color: #475569; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+
+        .square-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px 0; position: relative;}
+        #unit-square { width: 440px; height: 320px; position: relative; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+        
+        .square-block {
+            position: absolute;
+            box-sizing: border-box;
+            border: 1px solid rgba(255,255,255,0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 0.75rem;
+            transition: all 0.3s ease;
+        }
+
+        #pachinko-container { width: 440px; height: 320px; background: #0f172a; border-radius: 4px; position: relative; }
+        #pachinko-canvas { width: 100%; height: 100%; display: block; }
+
+        .c-0 { background-color: #bfdbfe; color: #1e3a8a; }
+        .c-1 { background-color: #fed7aa; color: #7c2d12; }
+        .c-2 { background-color: #bbf7d0; color: #14532d; }
+        .c-3 { background-color: #fef08a; color: #713f12; }
+        .c-4 { background-color: #e9d5ff; color: #581c87; }
+
+        .inactive-block { opacity: 0.1 !important; filter: grayscale(100%); }
+
+        .bridge-area {
+            background: var(--dark-bg);
+            color: #ffffff;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .formula-display { display: flex; align-items: center; gap: 10px; font-size: 1rem; justify-content: center; flex-wrap: wrap; }
+        .fraction { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .fraction-line { width: 100%; height: 2px; background-color: #ffffff; min-width: 150px; }
+        #calc-result { font-size: 1.4rem; font-weight: bold; color: #4ade80; }
+        
+        .target-selector { display: inline-block; background: #334155; color: white; border: 1px solid #475569; padding: 2px 6px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.9rem;}
+        
+        .error-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #ef4444;
+            font-size: 1.2rem;
+            z-index: 10;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>条件付き確率</h1>
+
+    <div style="background: #e2e8f0; padding: 10px; border-radius: 6px; font-size: 0.85rem;">
+        <div class="controls">
+            <strong>操作パネル：</strong>
+            <button id="btn-add">➕ 原因を追加</button>
+            <button id="btn-save" class="btn-save">💾 ブラウザに保存</button>
+            <button id="btn-share" class="btn-share">🔗 URLで共有</button>
+            <button id="btn-clear" class="btn-clear">🗑️ 初期化</button>
+            <span style="margin-left: 15px;">結果 B: <input type="text" id="g-label-b" value="陽性" style="font-weight:bold; width:70px; padding:2px;"></span>
+            <span>結果 B̄: <input type="text" id="g-label-bbar" value="陰性" style="font-weight:bold; width:70px; padding:2px; color:#64748b;"></span>
+        </div>
+    </div>
+
+    <div class="calculator-setup">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.85rem; color: #64748b;">※存在割合 P(Ai) の合計は必ず 100% にしてください。</span>
+            <button id="btn-auto-adjust" class="btn-warning">⚠️ 合計を100%に自動調整する</button>
+        </div>
+        <table class="matrix-table">
+            <thead>
+                <tr style="background-color: #f1f5f9;">
+                    <th style="width: 25%;"><input type="text" id="th-a" class="th-input" value="事前事象（原因 Ai）"></th>
+                    <th style="width: 20%;"><input type="text" id="th-pa" class="th-input" value="存在割合 P(Ai)"></th>
+                    <th style="width: 35%;"><input type="text" id="th-pba" class="th-input" value="条件付き確率 P(B|Ai)"></th>
+                    <th style="width: 10%;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="matrix-tbody"></tbody>
+            <tfoot>
+                <tr class="total-row">
+                    <td style="text-align: right;">合計：</td>
+                    <td><span id="total-pa">100.00</span> ％</td>
+                    <td colspan="2"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <div class="simulator-core">
+        <div class="pane">
+            <h2>📊 ビュー1：面積図</h2>
+            <div class="square-container">
+                <div id="unit-square"></div>
+                <div id="error-overlay" class="error-overlay">⚠️ 割合の合計を100%にしてください</div>
+            </div>
+        </div>
+
+        <div class="pane">
+            <h2>
+                <span>🔮 ビュー2：パチンコグラム</span>
+                <div style="display: inline-block; margin-left:10px;">
+                    <button id="btn-drop-one" style="background:#059669; padding:2px 8px; font-size:0.75rem;">1個落とす</button>
+                    <button id="btn-drop-multi" style="background:#d97706; padding:2px 8px; font-size:0.75rem;">100個流す</button>
+                    <button id="btn-clear-particles" style="background:#4b5563; padding:2px 8px; font-size:0.75rem;">クリア</button>
+                </div>
+            </h2>
+            <div class="square-container">
+                <div id="pachinko-container">
+                    <canvas id="pachinko-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bridge-area">
+        <div style="font-size:0.9rem; font-weight:bold; text-align:center; margin-bottom: 10px;">
+            🎯 ターゲット問題：結果が 
+            <select id="target-outcome" class="target-selector">
+                <option value="B">陽性</option>
+                <option value="Bbar">陰性</option>
+            </select> となったとき、それが 
+            <select id="target-index" class="target-selector"></select> である確率は？
+        </div>
+        
+        <div class="formula-display">
+            <span style="font-weight:bold; font-size:1.1rem;" id="formula-left">P(A1 | B) ＝</span>
+            <div class="fraction">
+                <div id="f-num" style="color: #60a5fa;">P(A1 ∩ B)</div>
+                <div class="fraction-line"></div>
+                <div id="f-den" style="color: #94a3b8;">P(A1 ∩ B) ＋ P(A2 ∩ B)</div>
+            </div>
+            <span>＝</span>
+            <div class="fraction">
+                <div id="f-num-val" style="color: #60a5fa;">0.00</div>
+                <div class="fraction-line"></div>
+                <div id="f-den-val" style="color: #f8fafc;">0.00</div>
+            </div>
+            <span>＝</span>
+            <span id="calc-result">0.0%</span>
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_ROWS = [
+            { label: "癌にかかっている", pA: 10, pBA: 80 },
+            { label: "健康である", pA: 90, pBA: 10 }
+        ];
+
+        let rows = JSON.parse(JSON.stringify(DEFAULT_ROWS));
+        let labelB = "陽性";
+        let labelBbar = "陰性";
+        let isTotalValid = true;
+
+        const colorsA_light = ['#bfdbfe', '#fed7aa', '#bbf7d0', '#fef08a', '#e9d5ff'];
+        const colorsA_dark  = ['#2563eb', '#ea580c', '#16a34a', '#ca8a04', '#9333ea'];
+
+        const tbody = document.getElementById('matrix-tbody');
+        const unitSquare = document.getElementById('unit-square');
+        const targetSelect = document.getElementById('target-index');
+        const targetOutcome = document.getElementById('target-outcome');
+        const totalPaSpan = document.getElementById('total-pa');
+        const btnAutoAdjust = document.getElementById('btn-auto-adjust');
+        const errorOverlay = document.getElementById('error-overlay');
+
+        const canvas = document.getElementById('pachinko-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let counts = {};
+
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+
+        function checkTotal() {
+            let total = rows.reduce((sum, r) => sum + r.pA, 0);
+            total = Math.round(total * 1000) / 1000; 
+            totalPaSpan.innerText = total.toFixed(2); 
+            isTotalValid = Math.abs(total - 100) < 0.01;
+
+            if (isTotalValid) {
+                totalPaSpan.style.color = 'var(--primary-color)';
+                btnAutoAdjust.style.display = 'none';
+                errorOverlay.style.display = 'none';
+            } else {
+                totalPaSpan.style.color = '#ef4444';
+                btnAutoAdjust.style.display = 'block';
+                errorOverlay.style.display = 'flex';
+            }
+            return isTotalValid;
+        }
+
+        btnAutoAdjust.addEventListener('click', () => {
+            let total = rows.reduce((sum, r) => sum + r.pA, 0);
+            if (total === 0) {
+                rows.forEach(r => r.pA = 100 / rows.length);
+            } else {
+                const ratio = 100 / total;
+                rows.forEach(r => r.pA = parseFloat((r.pA * ratio).toFixed(2)));
+            }
+            renderTable();
+        });
+
+        function renderTable() {
+            tbody.innerHTML = '';
+            rows.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="text" class="input-label" value="${row.label}" data-idx="${idx}" data-field="label"></td>
+                    <td><input type="number" class="input-num" value="${row.pA}" data-idx="${idx}" data-field="pA" step="0.1" min="0" max="100"> ％</td>
+                    <td>のとき、<span>${labelB}</span>になる確率: <input type="number" class="input-num" value="${row.pBA}" data-idx="${idx}" data-field="pBA" step="1" min="0" max="100"> ％</td>
+                    <td>${rows.length > 1 ? `<button class="btn-del" data-idx="${idx}">削除</button>` : ''}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            targetOutcome.options[0].text = labelB;
+            targetOutcome.options[1].text = labelBbar;
+
+            const currentSelected = targetSelect.value || "0";
+            targetSelect.innerHTML = '';
+            rows.forEach((row, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.innerText = row.label;
+                if(Number(currentSelected) === idx) opt.selected = true;
+                targetSelect.appendChild(opt);
+            });
+
+            if (checkTotal()) {
+                renderBlocks();
+                resetCounts();
+            }
+        }
+
+        function renderBlocks() {
+            if (!isTotalValid) return; 
+            unitSquare.innerHTML = '';
+            const W = 440, H = 320;
+            let currentLeft = 0;
+            let denValue = 0, numValue = 0; 
+            
+            const targetIdx = parseInt(targetSelect.value) || 0;
+            const chosenOutcome = targetOutcome.value; 
+            const chosenLabel = chosenOutcome === 'B' ? labelB : labelBbar;
+            let denStrings = [];
+
+            rows.forEach((row, idx) => {
+                const normalizedPA = row.pA / 100; 
+                const pBA = row.pBA / 100;
+                const pAiCapB = normalizedPA * pBA; 
+                const pAiCapBbar = normalizedPA * (1 - pBA);
+                let isTarget = (idx === targetIdx);
+
+                if (chosenOutcome === 'B') {
+                    denValue += pAiCapB;
+                    if(isTarget) numValue = pAiCapB;
+                    denStrings.push(`P(${row.label} ∩ ${labelB})`);
+                } else {
+                    denValue += pAiCapBbar;
+                    if(isTarget) numValue = pAiCapBbar;
+                    denStrings.push(`P(${row.label} ∩ ${labelBbar})`);
+                }
+
+                const blockW = W * normalizedPA;
+                const blockH_B = H * pBA; 
+                const blockH_Bbar = H - blockH_B; 
+                const colorClass = `c-${idx % 5}`;
+
+                if (blockW > 0) {
+                    if (blockH_B > 0) {
+                        const bBlock = document.createElement('div');
+                        bBlock.className = `square-block ${colorClass} ${chosenOutcome === 'Bbar' ? 'inactive-block' : ''}`;
+                        bBlock.style.left = `${currentLeft}px`;
+                        bBlock.style.top = `0px`;
+                        bBlock.style.width = `${blockW}px`;
+                        bBlock.style.height = `${blockH_B}px`;
+                        if(chosenOutcome === 'B' && isTarget) bBlock.style.border = "3px solid var(--highlight-color)";
+                        bBlock.innerHTML = `<b>P(${row.label} ∩ ${labelB})</b><br>${(pAiCapB*100).toFixed(1)}%`;
+                        unitSquare.appendChild(bBlock);
+                    }
+                    if (blockH_Bbar > 0) {
+                        const bbarBlock = document.createElement('div');
+                        bbarBlock.className = `square-block ${colorClass} ${chosenOutcome === 'B' ? 'inactive-block' : ''}`;
+                        bbarBlock.style.left = `${currentLeft}px`;
+                        bbarBlock.style.top = `${blockH_B}px`;
+                        bbarBlock.style.width = `${blockW}px`;
+                        bbarBlock.style.height = `${blockH_Bbar}px`;
+                        if(chosenOutcome === 'Bbar' && isTarget) bbarBlock.style.border = "3px solid var(--highlight-color)";
+                        bbarBlock.innerHTML = `<b>P(${row.label} ∩ ${labelBbar})</b><br>${(pAiCapBbar*100).toFixed(1)}%`;
+                        unitSquare.appendChild(bbarBlock);
+                    }
+                }
+                currentLeft += blockW;
+            });
+
+            const targetLabel = rows[targetIdx]?.label || `原因${targetIdx+1}`;
+            document.getElementById('formula-left').innerHTML = `P(${targetLabel} | ${chosenLabel}) ＝`;
+            document.getElementById('f-num').innerHTML = `P(${targetLabel} ∩ ${chosenLabel})`;
+            document.getElementById('f-den').innerHTML = denStrings.join(" ＋ ");
+            document.getElementById('f-num-val').innerText = numValue.toFixed(3);
+            document.getElementById('f-den-val').innerText = denValue.toFixed(3);
+            const finalAns = denValue > 0 ? ((numValue / denValue) * 100).toFixed(1) : "0.0";
+            document.getElementById('calc-result').innerText = `${finalAns}%`;
+        }
+
+        function resetCounts() {
+            counts = { total: 0 };
+            rows.forEach((_, i) => {
+                counts[`${i}-B`] = 0;
+                counts[`${i}-Bbar`] = 0;
+            });
+        }
+
+        function createParticle() {
+            if (!isTotalValid) return;
+            let randA = Math.random() * 100;
+            let chosenAIdx = 0;
+            let sum = 0;
+            for(let i=0; i<rows.length; i++) {
+                sum += rows[i].pA;
+                if(randA <= sum) { chosenAIdx = i; break; }
+            }
+
+            let randB = Math.random() * 100;
+            let isB = randB <= rows[chosenAIdx].pBA;
+
+            particles.push({
+                x: 220 + (Math.random() * 20 - 10),
+                y: 15,
+                targetA: chosenAIdx,
+                isB: isB,
+                stage: 0,
+                timer: 0,
+                color: colorsA_dark[chosenAIdx % 5]
+            });
+        }
+
+        // テキスト折返し描画用のヘルパー関数
+        function drawWrapText(context, text, x, y, maxWidth, lineHeight) {
+            const words = text.split('');
+            let line = '';
+            let currentY = y;
+
+            for (let n = 0; n < words.length; n++) {
+                let testLine = line + words[n];
+                let metrics = context.measureText(testLine);
+                let testWidth = metrics.width;
+                if (testWidth > maxWidth && n > 0) {
+                    context.fillText(line, x, currentY);
+                    line = words[n];
+                    currentY += lineHeight;
+                } else {
+                    line = testLine;
+                }
+            }
+            context.fillText(line, x, currentY);
+        }
+
+        function drawPachinko() {
+            ctx.clearRect(0, 0, 440, 320);
+            const W = 440, H = 320;
+            const chosenOutcome = targetOutcome.value;
+
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+
+            let curX = 0;
+            rows.forEach((row, i) => {
+                let nextX = curX + (W * (row.pA / 100));
+                let areaWidth = nextX - curX;
+
+                ctx.beginPath();
+                ctx.moveTo(220, 20);
+                ctx.lineTo(curX + areaWidth/2, 80);
+                ctx.stroke();
+
+                ctx.fillStyle = colorsA_light[i % 5] + "15"; 
+                ctx.fillRect(curX, 80, areaWidth, H - 140);
+
+                // 【改善箇所】文字サイズ動的調整＆自動折り返し＆はみ出しカット
+                if (areaWidth > 15) {
+                    ctx.save();
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.textAlign = 'center';
+                    
+                    // エリア幅が狭いときはフォントサイズを小さくする
+                    let fontSize = areaWidth < 50 ? 9 : 10;
+                    ctx.font = `${fontSize}px sans-serif`;
+                    
+                    // 余裕を持たせた最大幅を設定し、折り返し描画
+                    let maxTextWidth = areaWidth - 6;
+                    let midX = curX + areaWidth / 2;
+                    
+                    drawWrapText(ctx, row.label, midX, 95, maxTextWidth, fontSize + 2);
+                    ctx.restore();
+                }
+
+                let midX = curX + areaWidth/2;
+                ctx.beginPath();
+                ctx.moveTo(midX, 110);
+                ctx.lineTo(curX + areaWidth*0.25, 180);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(midX, 110);
+                ctx.lineTo(curX + areaWidth*0.75, 180);
+                ctx.stroke();
+
+                curX = nextX;
+            });
+
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 240, W, H - 240);
+            
+            ctx.strokeStyle = '#64748b';
+            ctx.beginPath();
+            ctx.moveTo(W/2, 240); ctx.lineTo(W/2, H);
+            ctx.stroke();
+
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = chosenOutcome === 'B' ? '#4ade80' : '#475569';
+            ctx.fillText(`【${labelB}の皿】`, 40, 260);
+            ctx.fillStyle = chosenOutcome === 'Bbar' ? '#4ade80' : '#475569';
+            ctx.fillText(`【${labelBbar}の皿】`, 260, 260);
+
+            let totalB = 0, totalBbar = 0;
+            rows.forEach((_, i) => {
+                totalB += counts[`${i}-B`] || 0;
+                totalBbar += counts[`${i}-Bbar`] || 0;
+            });
+            ctx.font = '11px Arial';
+            ctx.fillStyle = '#cbd5e1';
+            ctx.fillText(`カウント: ${totalB}個`, 40, 280);
+            ctx.fillText(`カウント: ${totalBbar}個`, 260, 280);
+
+            particles.forEach((p, idx) => {
+                p.timer += 0.04;
+                let startX = 220, startY = 20;
+                let aLeft = 0;
+                for(let i=0; i<p.targetA; i++) { aLeft += W * (rows[i].pA / 100); }
+                let aWidth = W * (rows[p.targetA].pA / 100);
+                let targetAX = aLeft + aWidth / 2;
+                let targetAY = 110;
+
+                let finalX = p.isB ? (aLeft + aWidth * 0.25) : (aLeft + aWidth * 0.75);
+                let finalY = 180;
+
+                let endX = p.isB ? 20 + (p.targetA * 30) + (idx % 4)*10 : 240 + (p.targetA * 30) + (idx % 4)*10;
+                let endY = 290 - (Math.floor(idx / 10) * 4);
+                if(endY < 265) endY = 265;
+
+                if (p.stage === 0) {
+                    p.x = startX + (targetAX - startX) * Math.min(p.timer, 1);
+                    p.y = startY + (targetAY - startY) * Math.min(p.timer, 1);
+                    if (p.timer >= 1) { p.stage = 1; p.timer = 0; }
+                } else if (p.stage === 1) {
+                    p.x = targetAX + (finalX - targetAX) * Math.min(p.timer, 1);
+                    p.y = targetAY + (finalY - targetAY) * Math.min(p.timer, 1);
+                    if (p.timer >= 1) { p.stage = 2; p.timer = 0; }
+                } else if (p.stage === 2) {
+                    p.x = finalX + (endX - finalX) * Math.min(p.timer, 1);
+                    p.y = finalY + (endY - finalY) * Math.min(p.timer, 1);
+                    if (p.timer >= 1) {
+                        p.stage = 3;
+                        let key = p.isB ? `${p.targetA}-B` : `${p.targetA}-Bbar`;
+                        counts[key] = (counts[key] || 0) + 1;
+                        counts.total++;
+                    }
+                } else {
+                    p.x = endX; p.y = endY;
+                }
+
+                let drawColor = p.color;
+                if (p.stage === 3) {
+                    if (chosenOutcome === 'B' && !p.isB) drawColor = "rgba(71,85,105,0.15)";
+                    if (chosenOutcome === 'Bbar' && p.isB) drawColor = "rgba(71,85,105,0.15)";
+                }
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.stage === 3 ? 3 : 4, 0, Math.PI * 2);
+                ctx.fillStyle = drawColor;
+                ctx.fill();
+            });
+
+            requestAnimationFrame(drawPachinko);
+        }
+
+        function saveData() {
+            const data = { rows, labelB, labelBbar };
+            localStorage.setItem('bayes_sim_data', JSON.stringify(data));
+            alert('設定を保存しました！');
+        }
+
+        function shareData() {
+            const data = { rows, labelB, labelBbar };
+            const jsonStr = JSON.stringify(data);
+            const base64 = btoa(encodeURIComponent(jsonStr));
+            const shareUrl = `${window.location.origin}${window.location.pathname}?data=${base64}`;
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                alert('共有URLをコピーしました！');
+            });
+        }
+
+        function clearData() {
+            if(confirm('初期化しますか？')) {
+                rows = JSON.parse(JSON.stringify(DEFAULT_ROWS));
+                labelB = "陽性"; labelBbar = "陰性";
+                document.getElementById('g-label-b').value = labelB;
+                document.getElementById('g-label-bbar').value = labelBbar;
+                particles = [];
+                renderTable();
+            }
+        }
+
+        function loadOnStart() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlData = urlParams.get('data');
+            if (urlData) {
+                try {
+                    const jsonStr = decodeURIComponent(atob(urlData));
+                    const parsed = JSON.parse(jsonStr);
+                    rows = parsed.rows; labelB = parsed.labelB; labelBbar = parsed.labelBbar;
+                } catch(e) {}
+            } else {
+                const localData = localStorage.getItem('bayes_sim_data');
+                if (localData) {
+                    try {
+                        const parsed = JSON.parse(localData);
+                        rows = parsed.rows; labelB = parsed.labelB; labelBbar = parsed.labelBbar;
+                    } catch(e) {}
+                }
+            }
+            document.getElementById('g-label-b').value = labelB;
+            document.getElementById('g-label-bbar').value = labelBbar;
+        }
+
+        document.getElementById('g-label-b').addEventListener('input', (e) => { labelB = e.target.value; renderTable(); });
+        document.getElementById('g-label-bbar').addEventListener('input', (e) => { labelBbar = e.target.value; renderTable(); });
+        document.getElementById('btn-save').addEventListener('click', saveData);
+        document.getElementById('btn-share').addEventListener('click', shareData);
+        document.getElementById('btn-clear').addEventListener('click', clearData);
+
+        tbody.addEventListener('input', (e) => {
+            const idx = parseInt(e.target.getAttribute('data-idx'));
+            const field = e.target.getAttribute('data-field');
+            if (field === 'label') {
+                rows[idx].label = e.target.value;
+            } else {
+                let val = parseFloat(e.target.value);
+                rows[idx][field] = isNaN(val) ? 0 : val;
+            }
+            if (checkTotal()) renderBlocks();
+        });
+
+        tbody.addEventListener('click', (e) => {
+            if(e.target.classList.contains('btn-del')) {
+                rows.splice(parseInt(e.target.getAttribute('data-idx')), 1);
+                renderTable();
+            }
+        });
+
+        document.getElementById('btn-add').addEventListener('click', () => {
+            rows.push({ label: `原因${rows.length + 1}`, pA: 0, pBA: 50 });
+            renderTable();
+        });
+
+        targetSelect.addEventListener('change', renderBlocks);
+        targetOutcome.addEventListener('change', renderBlocks);
+        document.getElementById('btn-drop-one').addEventListener('click', createParticle);
+        document.getElementById('btn-drop-multi').addEventListener('click', () => {
+            let count = 0;
+            let interval = setInterval(() => {
+                createParticle(); count++;
+                if(count >= 100) clearInterval(interval);
+            }, 30);
+        });
+        document.getElementById('btn-clear-particles').addEventListener('click', () => { particles = []; resetCounts(); });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadOnStart(); resizeCanvas(); renderTable(); drawPachinko();
+        });
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>
